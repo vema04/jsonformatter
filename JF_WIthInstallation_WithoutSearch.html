@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JSON Formatter with Search</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f4f4f9;
+        }
+        .container {
+            max-width: 1200px;
+            margin: auto;
+            display: flex;
+            gap: 20px;
+        }
+        .input-container, .output-container {
+            flex: 1;
+            padding: 20px;
+            box-sizing: border-box;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            background-color: #fff;
+            overflow: auto;
+            height: 600px;
+        }
+        .input-container textarea, .output-container pre {
+            width: 100%;
+            //height: calc(100% - 40px);
+            padding: 10px;
+            box-sizing: border-box;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 14px;
+            resize: vertical;
+            background-color: #f9f9f9;
+        }
+        .button-container {
+            margin-top: 10px;
+            text-align: right;
+        }
+        button {
+            padding: 10px 20px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-left: 5px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .search-container {
+            margin-top: 10px;
+            display: flex;
+            align-items: center;
+        }
+        .search-container input {
+            flex: 1;
+            padding: 8px;
+            box-sizing: border-box;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+        .search-container button {
+            padding: 8px 16px;
+            margin-left: 5px;
+        }
+        .search-results {
+            margin-top: 10px;
+            font-style: italic;
+            color: #333;
+        }
+        .highlight {
+            background-color: yellow;
+        }
+        .json-key {
+            color: brown;
+        }
+        .json-value {
+            color: green;
+        }
+        .json-array {
+            color: blue;
+        }
+        .json-object {
+            color: purple;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="input-container">
+		<div class="button-container">
+            <button onclick="formatJSON()">Format JSON</button>
+            <button onclick="copyToClipboard()">Copy Formated JSON</button>
+        </div>
+		<h2>JSON Input</h2>
+        <textarea id="jsonInput" placeholder="Enter your JSON here..."></textarea>
+        
+    </div>
+    <div class="output-container">
+        <!-- <div class="search-container"> -->
+            <!-- <input type="text" id="searchInput" placeholder="Search key or value..."> -->
+            <!-- <button onclick="searchJSON('prev')">Previous</button> -->
+            <!-- <button onclick="searchJSON('next')">Next</button> -->
+        <!-- </div> -->
+        <pre id="jsonOutput"></pre>
+        <div class="search-results" id="searchResults"></div>
+    </div>
+</div>
+
+<script>
+    let jsonNodes = [];
+    let currentIndex = -1;
+
+    function formatJSON() {
+        const jsonInput = document.getElementById('jsonInput').value.trim();
+        const jsonOutput = document.getElementById('jsonOutput');
+        const searchResults = document.getElementById('searchResults');
+
+        try {
+            const parsedJSON = JSON.parse(jsonInput);
+            const formattedJSON = buildTree(parsedJSON);
+            jsonOutput.innerHTML = formattedJSON;
+            jsonNodes = Array.from(jsonOutput.querySelectorAll('span'));
+            searchResults.textContent = '';
+            currentIndex = -1;
+        } catch (error) {
+            jsonOutput.textContent = 'Invalid JSON: ' + error.message;
+            searchResults.textContent = '';
+        }
+    }
+
+    function buildTree(data, indentLevel = 0) {
+        const getType = (value) => {
+            if (Array.isArray(value)) return 'array';
+            if (typeof value === 'object' && value !== null) return 'object';
+            return typeof value;
+        };
+
+        const buildNode = (key, value, indentLevel) => {
+            const type = getType(value);
+            let html = '';
+            const indent = '  '.repeat(indentLevel);
+
+            if (type === 'array') {
+                html += `${indent}<span class="json-key">${key}:</span> <span class="json-array">[</span>\n`;
+                value.forEach((item, index) => {
+                    html += buildNode(index, item, indentLevel + 1);
+                    if (index < value.length - 1) {
+                        html += ',\n';
+                    } else {
+                        html += '\n';
+                    }
+                });
+                html += `${indent}<span class="json-array">]</span>`;
+            } else if (type === 'object') {
+                html += `${indent}<span class="json-key">${key}:</span> <span class="json-object">{</span>\n`;
+                Object.keys(value).forEach((k, index, array) => {
+                    html += buildNode(k, value[k], indentLevel + 1);
+                    if (index < array.length - 1) {
+                        html += ',\n';
+                    } else {
+                        html += '\n';
+                    }
+                });
+                html += `${indent}<span class="json-object">}</span>`;
+            } else {
+                html += `${indent}<span class="json-key">${key}:</span> <span class="json-value">${JSON.stringify(value)}</span>`;
+            }
+
+            return html;
+        };
+
+        return `<code>\n${buildNode('root', data, indentLevel)}\n</code>`;
+    }
+
+    function copyToClipboard() {
+        const jsonOutput = document.getElementById('jsonOutput');
+        const tempTextArea = document.createElement('textarea');
+        tempTextArea.value = jsonOutput.textContent;
+        document.body.appendChild(tempTextArea);
+        tempTextArea.select();
+        document.execCommand('copy');
+        document.body.removeChild(tempTextArea);
+        alert('JSON copied to clipboard');
+    }
+
+    function searchJSON(direction) {
+        const searchInput = document.getElementById('searchInput').value.toLowerCase();
+        const searchResults = document.getElementById('searchResults');
+        const searchIndex = direction === 'prev' ? currentIndex - 1 : currentIndex + 1;
+        let found = false;
+
+        if (searchInput && jsonNodes.length > 0) {
+            for (let i = searchIndex; direction === 'prev' ? i >= 0 : i < jsonNodes.length; direction === 'prev' ? i-- : i++) {
+                const node = jsonNodes[i];
+                if (node.textContent.toLowerCase().includes(searchInput)) {
+                    node.classList.add('highlight');
+                    scrollIntoView(node.parentNode);
+                    currentIndex = i;
+                    updateSearchResults(i + 1, jsonNodes.length);
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) {
+                searchResults.textContent = 'No more results.';
+                currentIndex = direction === 'prev' ? jsonNodes.length - 1 : 0;
+            }
+        } else {
+            searchResults.textContent = '';
+            currentIndex = -1;
+        }
+    }
+
+    function updateSearchResults(currentIndex, totalNodes) {
+        const searchResults = document.getElementById('searchResults');
+        searchResults.textContent = `Result ${currentIndex} of ${totalNodes}`;
+    }
+
+    function scrollIntoView(element) {
+        element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+</script>
+
+</body>
+</html>
